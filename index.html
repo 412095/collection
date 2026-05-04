@@ -64,6 +64,390 @@
       text-align: center;
       box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
     }
+
+    /* 登入載入中狀態 */
+    #auth-loading {
+      display: none;
+      margin-top: 1rem;
+      color: #aa771c;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+
+  <!-- 登入遮罩 -->
+  <div id="auth-overlay">
+    <div class="login-card art-border max-w-md w-full">
+      <h1 class="text-3xl font-black text-slate-900 mb-2">畫師寶庫</h1>
+      <p class="text-[#aa771c] italic mb-8">登入以存取您的私人藝術館藏</p>
+      
+      <div id="login-buttons" class="space-y-4">
+        <button onclick="login()" class="flex items-center justify-center gap-3 w-full bg-white border border-slate-200 py-3 px-6 hover:bg-slate-50 transition-all shadow-md group">
+          <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          <span class="font-bold text-slate-700">使用 Google 帳戶登入</span>
+        </button>
+      </div>
+
+      <div id="auth-loading">連線驗證中，請稍候...</div>
+      
+      <p class="mt-6 text-[10px] text-slate-400">如果您在彈出視窗遇到問題，請確保瀏覽器未封鎖彈出式視窗。</p>
+    </div>
+  </div>
+
+  <div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
+      <div class="flex-1">
+        <h1 class="text-4xl font-black text-slate-900 tracking-tighter mb-2">畫師寶庫 <span class="text-[#aa771c] italic font-serif">The Atelier</span></h1>
+        <div class="flex items-center gap-4">
+          <p id="user-display" class="text-slate-500 text-sm font-bold"></p>
+          <button onclick="logout()" class="text-xs text-red-700 hover:underline">登出系統</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-8 bg-white/50 backdrop-blur-sm p-6 art-border shadow-lg">
+        <div class="text-right">
+          <p class="text-[10px] text-[#aa771c] font-bold uppercase tracking-[0.2em]">當前館藏估價</p>
+          <p id="header-total-value" class="text-2xl font-bold text-slate-900 font-mono">$0</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- 橫式藏品登記表單 -->
+    <section class="mb-12 bg-[#fdfcf8] p-8 art-border shadow-md">
+      <div class="flex items-center gap-4 mb-6">
+        <h3 class="font-bold text-slate-900 text-sm tracking-widest uppercase">新藏品登記工作台</h3>
+        <div class="flex-1 h-[1px] bg-slate-100"></div>
+      </div>
+      <div class="horizontal-form-grid">
+        <div class="flex flex-col">
+          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">作品名稱</label>
+          <input type="text" id="title" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm">
+        </div>
+        <div class="flex flex-col">
+          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">類別</label>
+          <select id="category" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm">
+            <option value="💻 電繪設備">💻 電繪設備</option>
+            <option value="🖌️ 實體畫具">🖌️ 實體畫具</option>
+            <option value="🌈 色彩美學">🌈 色彩美學</option>
+            <option value="📚 參考資料">📚 參考資料</option>
+          </select>
+        </div>
+        <div class="flex flex-col">
+          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">價值 (TWD)</label>
+          <input type="number" id="value" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm font-mono">
+        </div>
+        <div class="flex flex-col">
+          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">作品照片</label>
+          <input type="file" id="imageInput" accept="image/*" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:bg-[#aa771c] file:text-white hover:file:bg-black">
+        </div>
+        <div class="flex items-end">
+          <button onclick="handleSave()" id="saveBtn" class="w-full bg-[#aa771c] hover:bg-[#1a1a1a] text-white font-bold py-2.5 px-4 transition-all shadow-lg tracking-widest uppercase text-[10px]">
+            納入館藏
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+      <aside class="lg:col-span-4 space-y-10">
+        <div class="group relative">
+          <input type="text" id="search-input" oninput="handleSearch()" placeholder="搜尋館藏..." class="w-full bg-transparent border-b-2 border-slate-300 py-3 pl-8 focus:border-[#aa771c] outline-none transition-all placeholder:text-slate-400 italic">
+        </div>
+      </aside>
+
+      <main class="lg:col-span-8">
+        <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-3 mb-10">
+           <span class="w-2 h-8 bg-[#aa771c]"></span>
+           當前館藏清單
+        </h2>
+        <div id="loading" class="hidden flex flex-col items-center py-20">
+          <div class="w-10 h-10 border-2 border-[#aa771c] border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div id="collection-list" class="grid grid-cols-1 md:grid-cols-2 gap-10"></div>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#f4f1ea] px-8 py-4 shadow-2xl transition-all duration-700 opacity-0 pointer-events-none z-[200] border-l-4 border-[#aa771c]">
+    <span id="toast-text" class="text-xs font-bold tracking-widest uppercase">館藏更新成功</span>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, where, deleteDoc, doc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAUVkHUMInFnfXXxSBIdF18i5VDQb1eOMY",
+      authDomain: "collection-1ac37.firebaseapp.com",
+      projectId: "collection-1ac37",
+      storageBucket: "collection-1ac37.firebasestorage.app",
+      messagingSenderId: "708734269102",
+      appId: "1:708734269102:web:ff8be53ddb4a238ae81f3f",
+      measurementId: "G-N7NPDW115J"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const provider = new GoogleAuthProvider();
+
+    let currentUser = null;
+    let allItems = [];
+    const appId = 'collection-1ac37';
+
+    // 暴露函數到全域
+    window.login = async () => {
+      document.getElementById('auth-loading').style.display = 'block';
+      try {
+        // 優先使用 Popup，如果報錯則回退到 Redirect
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.log("Popup failed, trying Redirect:", error.code);
+        if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
+          await signInWithRedirect(auth, provider);
+        } else {
+          alert("登入失敗: " + error.message);
+        }
+      }
+    };
+
+    window.logout = () => signOut(auth);
+    window.handleSave = handleSave;
+    window.handleDelete = handleDelete;
+    window.handleSearch = handleSearch;
+
+    // 處理 Redirect 結果 (如果是從 Redirect 回來的)
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect Result Error:", error);
+    });
+
+    // 監聽登入狀態
+    onAuthStateChanged(auth, (user) => {
+      const overlay = document.getElementById('auth-overlay');
+      if (user) {
+        currentUser = user;
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.style.display = 'none', 500);
+        document.getElementById('user-display').innerText = `管理員：${user.displayName || user.email}`;
+        initCollectionListener();
+      } else {
+        currentUser = null;
+        overlay.style.display = 'flex';
+        overlay.style.opacity = '1';
+        document.getElementById('auth-loading').style.display = 'none';
+        document.getElementById('collection-list').innerHTML = '';
+      }
+    });
+
+    function initCollectionListener() {
+      if (!currentUser) return;
+      document.getElementById('loading').classList.remove('hidden');
+      
+      const q = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks');
+      
+      onSnapshot(q, (snapshot) => {
+        allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        renderList(allItems);
+        updateHeaderValue();
+        document.getElementById('loading').classList.add('hidden');
+      }, (err) => {
+        console.error("Firestore Error:", err);
+        if (err.code === 'permission-denied') {
+          alert("存取權限被拒絕，請檢查 Firestore 規則設置。");
+        }
+      });
+    }
+
+    async function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    async function handleSave() {
+      if (!currentUser) return;
+      
+      const title = document.getElementById('title').value;
+      const category = document.getElementById('category').value;
+      const value = parseInt(document.getElementById('value').value);
+      const fileInput = document.getElementById('imageInput');
+      
+      if (!title || isNaN(value)) { showToast("請完整填寫資訊"); return; }
+
+      let base64Image = "";
+      if (fileInput.files.length > 0) {
+        try {
+          base64Image = await fileToBase64(fileInput.files[0]);
+          // 檢查 base64 大小 (Firestore 限制 1MB)
+          if (base64Image.length > 1000000) {
+            alert("圖片太大！請壓縮圖片後再上傳 (需小於 700KB)");
+            return;
+          }
+        } catch (e) {
+          console.error("Image process error", e);
+        }
+      }
+
+      try {
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = true;
+        btn.innerText = "入庫中...";
+
+        await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks'), {
+          title,
+          category,
+          value,
+          imageData: base64Image,
+          timestamp: new Date().toISOString()
+        });
+
+        document.getElementById('title').value = '';
+        document.getElementById('value').value = '';
+        document.getElementById('imageInput').value = '';
+        showToast("資產已同步至雲端");
+      } catch (e) {
+        console.error("Save error:", e);
+        showToast("儲存失敗: " + e.message);
+      } finally {
+        const btn = document.getElementById('saveBtn');
+        btn.disabled = false;
+        btn.innerText = "納入館藏";
+      }
+    }
+
+    async function handleDelete(id) {
+      if (!confirm("確定要從雲端移除此資產嗎？")) return;
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks', id));
+        showToast("資產已移除");
+      } catch (e) {
+        showToast("移除失敗");
+      }
+    }
+
+    function renderList(items) {
+      const container = document.getElementById('collection-list');
+      if (items.length === 0) {
+        container.innerHTML = `<p class="col-span-full text-center py-24 text-slate-400 italic">雲端畫布尚為空白...</p>`;
+        return;
+      }
+
+      container.innerHTML = items.map(item => `
+        <div class="bg-white p-6 shadow-sm card-hover relative group border border-slate-100">
+          <div class="flex justify-between items-start mb-6">
+             <div class="flex items-center gap-5">
+                <img src="${item.imageData || 'https://via.placeholder.com/150?text=Art'}" class="w-20 h-20 object-cover art-border shadow-md" onerror="this.src='https://via.placeholder.com/150?text=Error'">
+                <div>
+                  <span class="category-tag">${item.category}</span>
+                  <h3 class="font-bold text-slate-900 text-lg mt-1">${item.title}</h3>
+                </div>
+             </div>
+             <button onclick="handleDelete('${item.id}')" class="text-slate-200 hover:text-red-500 transition-colors">✕</button>
+          </div>
+          <div class="border-t border-slate-50 pt-4 flex justify-between items-end">
+            <div>
+              <p class="text-[8px] text-[#aa771c] font-bold uppercase">Appraisal</p>
+              <p class="text-xl font-black text-slate-900 font-mono">$${item.value.toLocaleString()}</p>
+            </div>
+            <p class="text-[10px] text-slate-400">${new Date(item.timestamp).toLocaleDateString()}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function updateHeaderValue() {
+      const total = allItems.reduce((sum, item) => sum + (parseInt(item.value) || 0), 0);
+      document.getElementById('header-total-value').innerText = `$${total.toLocaleString()}`;
+    }
+
+    function handleSearch() {
+      const queryStr = document.getElementById('search-input').value.toLowerCase();
+      renderList(allItems.filter(i => i.title.toLowerCase().includes(queryStr)));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toast-text');
+      if(toastText) toastText.innerText = msg;
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      setTimeout(() => toast.classList.add('opacity-0'), 3000);
+    }
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>畫師寶庫 - 雲端藝術管理系統</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,800;1,400&family=Noto+Serif+TC:wght@400;700&display=swap');
+    
+    body {
+      font-family: 'Noto Serif TC', serif;
+      background-color: #f4f1ea;
+      background-image: url('https://www.transparenttextures.com/patterns/canvas-orange.png');
+      color: #2c3e50;
+    }
+
+    .art-border {
+      border: 8px solid #d4af37;
+      border-image: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c) 1;
+    }
+
+    .card-hover {
+      transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+      border: 1px solid rgba(180, 160, 120, 0.2);
+    }
+    .card-hover:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: 0 30px 50px -12px rgba(0, 0, 0, 0.15);
+      border-color: #d4af37;
+    }
+
+    .category-tag {
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+      padding: 2px 10px;
+      border-radius: 2px;
+      background: #2c3e50;
+      color: #f4f1ea;
+    }
+
+    .horizontal-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      align-items: flex-end;
+    }
+
+    #auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 26, 26, 0.98);
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s ease;
+    }
+
+    .login-card {
+      background: #fdfcf8;
+      padding: 3rem;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
   </style>
 </head>
 <body class="p-4 md:p-8">
