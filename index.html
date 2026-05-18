@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght=0,400;0,800;1,400&family=Noto+Serif+TC:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght=0,400;0,800;1,400&family=Noto+Serif+TC:wght=400;700&display=swap');
     
     body {
       font-family: 'Noto Serif TC', serif;
@@ -86,9 +86,12 @@
       <div id="login-buttons" class="mt-8 space-y-4 hidden">
         <p class="text-xs text-rose-600 font-bold mb-4">⚠️ 偵測到瀏覽器限制彈出式視窗，您可以手動點擊重試：</p>
         <button id="google-login-btn" onclick="login()" class="flex items-center justify-center gap-3 w-full bg-white border border-slate-200 py-3 px-6 hover:bg-slate-50 transition-all shadow-md group">
-          <!-- 修正後完美的 Google 官方標籤 SVG，無格式錯誤 -->
+          <!-- 修正後的完美官方規格 Google SVG -->
           <svg class="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.11C18.29 1.156 15.474 0 12.24 0 5.58 0 0 5.37 0 12s5.58 12 12.24 12c6.96 0 11.57-4.814 11.57-11.79 0-.795-.085-1.4-.19-1.925H12.24z"/>
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.31 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.32 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.61H1.21C.44 8.24 0 10.06 0 12s.44 3.76 1.21 5.39l4.11-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.18 2.12 1.21 5.39l4.11 3.15c.94-2.85 3.57-4.96 6.68-4.96z"/>
           </svg>
           <span id="google-btn-text" class="font-bold text-slate-700">使用 Google 帳戶登入</span>
         </button>
@@ -206,15 +209,14 @@
     let googleProvider = null; 
     let currentUser = null;
     let allItems = [];
-    let currentListenerUnsubscribe = null; // 紀錄當前的監聽器，避免背景重複多重監聽引發權限錯誤
+    let currentListenerUnsubscribe = null; 
     
-    // 優先匹配 Sandbox 動態 appId，若無則回退預設
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'collection-1ac37';
 
-    // 認證鎖定閥
+    // 認證鎖定閥，避免在 COOP 未就緒前多次並發請求
     let isAuthProcessing = false;
 
-    // 1. 安全初始化 (遵守 RULE 3: 先登入，後讀取)
+    // 1. 安全初始化 (遵守 RULE 3: 先認證登入，後查詢)
     const initAuth = async () => {
       if (isAuthProcessing) return;
       isAuthProcessing = true;
@@ -242,7 +244,7 @@
 
     initAuth();
 
-    // 2. Google 登入邏輯
+    // 2. Google 登入邏輯 (包含防並行阻斷與 Iframe 防摔處理)
     window.login = async () => {
       if (isAuthProcessing) return;
       isAuthProcessing = true;
@@ -293,7 +295,7 @@
       if (isAuthProcessing) return;
       isAuthProcessing = true;
       
-      // 先註銷即時監聽，避免引發登出後的權限不足 (Permissions denied)
+      // 登出時立刻註銷當前的監聽器，避免背景重複查詢觸發登出後的 permissions denied
       if (currentListenerUnsubscribe) {
         currentListenerUnsubscribe();
         currentListenerUnsubscribe = null;
@@ -382,582 +384,33 @@
 
     // 3. 監聽並加載數據 (遵守 RULE 1, 2, 3 完整組合)
     function initCollectionListener() {
-      // 嚴密防禦網：未完全登入或 UID 遺失時，絕對不開啟 Firestore 監聽 (RULE 3)
-      if (!currentUser || !currentUser.uid || !appId || appId === "undefined") {
-        console.warn("暫緩開啟 Firestore 監聽：認證狀態不完整。");
+      // 驗證守門員 (嚴格遵守 Rule 3)：若使用者未登入完畢、或 uid/appId 為空、文字 undefined，絕對不發起 query 監聽
+      if (!currentUser || !currentUser.uid || currentUser.uid === "undefined" || !appId || appId === "undefined") {
+        console.warn("暫緩開啟 Firestore 監聽：認證狀態尚不完整。");
         return;
       }
       
       const loader = document.getElementById('loading');
       if (loader) loader.classList.remove('hidden');
       
-      // 避免重複註冊多個衝突的監聽器
+      // 登銷重複的監聽器，避免背景多執行緒重複查詢引發 Permissions 錯誤
       if (currentListenerUnsubscribe) {
         currentListenerUnsubscribe();
         currentListenerUnsubscribe = null;
       }
       
-      // 確保這裡的路徑與安全性規則完全一致 (RULE 1)
+      // 確保連線路徑完全符合 RULE 1
       const q = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks');
       
       currentListenerUnsubscribe = onSnapshot(q, (snapshot) => {
         allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // 前端排序，避開 Firebase 因缺少多欄位索引 (Index) 而拋出的權限限制錯誤 (RULE 2)
+        // 前端排序，避免未建索引的複合查詢導致 permissions 拒絕 (RULE 2)
         allItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
         renderList(allItems);
         updateHeaderValue();
         if (loader) loader.classList.add('hidden');
       }, (err) => {
-        console.error("Firestore 監聽拒絕 (請確認已將 rules.txt 發佈到 Firebase 控制台):", err);
-        showToast("雲端連線受阻，請先在控制台發佈最新的安全規則！");
-      });
-    }
-
-    async function fileToBase64(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-      });
-    }
-
-    async function handleSave() {
-      if (!currentUser || !currentUser.uid) {
-        showToast("未登入，無法儲存");
-        return;
-      }
-      
-      const title = document.getElementById('title').value;
-      const category = document.getElementById('category').value;
-      const value = parseInt(document.getElementById('value').value);
-      const fileInput = document.getElementById('imageInput');
-      
-      if (!title || isNaN(value)) { showToast("請完整填寫資訊"); return; }
-
-      let base64Image = "";
-      if (fileInput && fileInput.files.length > 0) {
-        try {
-          base64Image = await fileToBase64(fileInput.files[0]);
-          if (base64Image.length > 1000000) {
-            alert("圖片過大！請上傳小於 700KB 的圖片檔案。");
-            return;
-          }
-        } catch (e) {
-          console.error("圖片轉檔失敗:", e);
-        }
-      }
-
-      try {
-        const btn = document.getElementById('saveBtn');
-        if (btn) {
-          btn.disabled = true;
-          btn.innerText = "同步至雲端...";
-        }
-
-        await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks'), {
-          title,
-          category,
-          value,
-          imageData: base64Image,
-          timestamp: new Date().toISOString()
-        });
-
-        document.getElementById('title').value = '';
-        document.getElementById('value').value = '';
-        if (fileInput) fileInput.value = '';
-        showToast("藏品同步至雲端");
-      } catch (e) {
-        console.error("上傳失敗:", e);
-        showToast("上傳失敗: " + e.message);
-      } finally {
-        const btn = document.getElementById('saveBtn');
-        if (btn) {
-          btn.disabled = false;
-          btn.innerText = "納入館藏";
-        }
-      }
-    }
-
-    async function handleDelete(id) {
-      if (!currentUser || !currentUser.uid) return;
-      if (!confirm("確定要將此藏品自雲端撤庫嗎？")) return;
-      try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks', id));
-        showToast("藏品已撤庫");
-      } catch (e) {
-        showToast("移除失敗");
-      }
-    }
-
-    function renderList(items) {
-      const container = document.getElementById('collection-list');
-      if (!container) return;
-      if (items.length === 0) {
-        container.innerHTML = `<p class="col-span-full text-center py-24 text-slate-400 italic">畫布尚為空白，等待您的入藏...</p>`;
-        return;
-      }
-
-      container.innerHTML = items.map(item => `
-        <div class="bg-white p-6 shadow-sm card-hover relative group border border-slate-100">
-          <div class="flex justify-between items-start mb-6">
-             <div class="flex items-center gap-5">
-                <img src="${item.imageData || 'https://via.placeholder.com/150?text=Atelier'}" class="w-20 h-20 object-cover art-border shadow-md" onerror="this.src='https://via.placeholder.com/150?text=Image+Error'">
-                <div>
-                  <span class="category-tag">${item.category}</span>
-                  <h3 class="font-bold text-slate-900 text-lg mt-1">${item.title}</h3>
-                </div>
-             </div>
-             <button onclick="handleDelete('${item.id}')" class="text-slate-200 hover:text-red-500 transition-colors">✕</button>
-          </div>
-          <div class="border-t border-slate-50 pt-4 flex justify-between items-end">
-            <div>
-              <p class="text-[8px] text-[#aa771c] font-bold uppercase">Appraisal</p>
-              <p class="text-xl font-black text-slate-900 font-mono">$${item.value.toLocaleString()}</p>
-            </div>
-            <p class="text-[10px] text-slate-400">${new Date(item.timestamp).toLocaleDateString()}</p>
-          </div>
-        </div>
-      `).join('');
-    }
-
-    function updateHeaderValue() {
-      const total = allItems.reduce((sum, item) => sum + (parseInt(item.value) || 0), 0);
-      const valEl = document.getElementById('header-total-value');
-      if (valEl) valEl.innerText = `$${total.toLocaleString()}`;
-    }
-
-    function handleSearch() {
-      const inputEl = document.getElementById('search-input');
-      if (!inputEl) return;
-      const queryStr = inputEl.value.toLowerCase();
-      renderList(allItems.filter(i => i.title.toLowerCase().includes(queryStr)));
-    }
-
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      const toastText = document.getElementById('toast-text');
-      if (toastText) toastText.innerText = msg;
-      if (toast) {
-        toast.classList.remove('opacity-0');
-        toast.classList.add('opacity-100');
-        setTimeout(() => toast.classList.add('opacity-0'), 3000);
-      }
-    }
-  </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <title>畫師寶庫 - 雲端藝術管理系統</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght=0,400;0,800;1,400&family=Noto+Serif+TC:wght@400;700&display=swap');
-    
-    body {
-      font-family: 'Noto Serif TC', serif;
-      background-color: #f4f1ea;
-      background-image: url('https://www.transparenttextures.com/patterns/canvas-orange.png');
-      color: #2c3e50;
-    }
-
-    .art-border {
-      border: 8px solid #d4af37;
-      border-image: linear-gradient(45deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c) 1;
-    }
-
-    .card-hover {
-      transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-      border: 1px solid rgba(180, 160, 120, 0.2);
-    }
-    .card-hover:hover {
-      transform: translateY(-8px) scale(1.02);
-      box-shadow: 0 30px 50px -12px rgba(0, 0, 0, 0.15);
-      border-color: #d4af37;
-    }
-
-    .category-tag {
-      font-size: 0.65rem;
-      letter-spacing: 1px;
-      padding: 2px 10px;
-      border-radius: 2px;
-      background: #2c3e50;
-      color: #f4f1ea;
-    }
-
-    .horizontal-form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-      align-items: flex-end;
-    }
-
-    #auth-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(26, 26, 26, 0.98);
-      z-index: 500;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.5s ease;
-    }
-
-    .login-card {
-      background: #fdfcf8;
-      padding: 3rem;
-      text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-    }
-
-    #auth-loading {
-      margin-top: 1rem;
-      color: #aa771c;
-      font-size: 0.85rem;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body class="p-4 md:p-8">
-
-  <!-- 登入遮罩 -->
-  <div id="auth-overlay">
-    <div class="login-card art-border max-w-md w-full">
-      <h1 class="text-3xl font-black text-slate-900 mb-2">畫師寶庫</h1>
-      <p class="text-[#aa771c] italic mb-8">正在進入私人藝術空間...</p>
-      
-      <div id="auth-loading" class="animate-pulse">正在安全對接雲端畫廊，請稍候...</div>
-
-      <div id="login-buttons" class="mt-8 space-y-4 hidden">
-        <p class="text-xs text-rose-600 font-bold mb-4">⚠️ 偵測到瀏覽器限制彈出式視窗，您可以手動點擊重試：</p>
-        <button id="google-login-btn" onclick="login()" class="flex items-center justify-center gap-3 w-full bg-white border border-slate-200 py-3 px-6 hover:bg-slate-50 transition-all shadow-md group">
-          <!-- 修正後完美的 Google 官方標籤 SVG，無格式錯誤 -->
-          <svg class="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l3.227-3.11C18.29 1.156 15.474 0 12.24 0 5.58 0 0 5.37 0 12s5.58 12 12.24 12c6.96 0 11.57-4.814 11.57-11.79 0-.795-.085-1.4-.19-1.925H12.24z"/>
-          </svg>
-          <span id="google-btn-text" class="font-bold text-slate-700">使用 Google 帳戶登入</span>
-        </button>
-        <button id="anon-login-btn" onclick="bypassWithAnonymous()" class="w-full text-xs text-slate-500 hover:text-slate-800 underline block py-2">
-          使用免註冊訪客模式進入 🚪
-        </button>
-      </div>
-      
-      <p class="mt-6 text-[10px] text-slate-400 leading-relaxed">
-        註：在 Sandboxed Iframe 中，Google 登入可能因瀏覽器的 COOP 阻擋而受限。本系統已為您配置安全匿名鏈接，可自動進入。
-      </p>
-    </div>
-  </div>
-
-  <div class="max-w-6xl mx-auto">
-    <!-- Header -->
-    <header class="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
-      <div class="flex-1">
-        <h1 class="text-4xl font-black text-slate-900 tracking-tighter mb-2">畫師寶庫 <span class="text-[#aa771c] italic font-serif">The Atelier</span></h1>
-        <div class="flex items-center gap-4">
-          <p id="user-display" class="text-slate-500 text-sm font-bold"></p>
-          <button id="logout-btn" onclick="logout()" class="text-xs text-red-700 hover:underline hidden">登出系統</button>
-          <button id="login-upgrade-btn" onclick="login()" class="text-xs text-blue-700 hover:underline hidden">🎨 綁定 Google 帳號</button>
-        </div>
-      </div>
-      <div class="flex items-center gap-8 bg-white/50 backdrop-blur-sm p-6 art-border shadow-lg">
-        <div class="text-right">
-          <p class="text-[10px] text-[#aa771c] font-bold uppercase tracking-[0.2em]">當前館藏估價</p>
-          <p id="header-total-value" class="text-2xl font-bold text-slate-900 font-mono">$0</p>
-        </div>
-      </div>
-    </header>
-
-    <!-- 橫式藏品登記表單 -->
-    <section class="mb-12 bg-[#fdfcf8] p-8 art-border shadow-md">
-      <div class="flex items-center gap-4 mb-6">
-        <h3 class="font-bold text-slate-900 text-sm tracking-widest uppercase">新藏品登記工作台</h3>
-        <div class="flex-1 h-[1px] bg-slate-100"></div>
-      </div>
-      <div class="horizontal-form-grid">
-        <div class="flex flex-col">
-          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">作品名稱</label>
-          <input type="text" id="title" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm">
-        </div>
-        <div class="flex flex-col">
-          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">類別</label>
-          <select id="category" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm">
-            <option value="💻 電繪設備">💻 電繪設備</option>
-            <option value="🖌️ 實體畫具">🖌️ 實體畫具</option>
-            <option value="🌈 色彩美學">🌈 色彩美學</option>
-            <option value="📚 參考資料">📚 參考資料</option>
-          </select>
-        </div>
-        <div class="flex flex-col">
-          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">價值 (TWD)</label>
-          <input type="number" id="value" class="w-full p-2 bg-white border border-slate-100 focus:border-[#aa771c] outline-none text-sm font-mono">
-        </div>
-        <div class="flex flex-col">
-          <label class="text-[9px] font-bold text-[#aa771c] uppercase tracking-widest mb-1">作品照片</label>
-          <input type="file" id="imageInput" accept="image/*" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:border-0 file:text-[10px] file:font-bold file:bg-[#aa771c] file:text-white hover:file:bg-black">
-        </div>
-        <div class="flex items-end">
-          <button onclick="handleSave()" id="saveBtn" class="w-full bg-[#aa771c] hover:bg-[#1a1a1a] text-white font-bold py-2.5 px-4 transition-all shadow-lg tracking-widest uppercase text-[10px]">
-            納入館藏
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Main Content -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
-      <aside class="lg:col-span-4 space-y-10">
-        <div class="group relative">
-          <input type="text" id="search-input" oninput="handleSearch()" placeholder="搜尋館藏..." class="w-full bg-transparent border-b-2 border-slate-300 py-3 pl-8 focus:border-[#aa771c] outline-none transition-all placeholder:text-slate-400 italic">
-        </div>
-      </aside>
-
-      <main class="lg:col-span-8">
-        <h2 class="text-2xl font-bold text-slate-900 flex items-center gap-3 mb-10">
-           <span class="w-2 h-8 bg-[#aa771c]"></span>
-           當前館藏清單
-        </h2>
-        <div id="loading" class="hidden flex flex-col items-center py-20">
-          <div class="w-10 h-10 border-2 border-[#aa771c] border-t-transparent rounded-full animate-spin"></div>
-        </div>
-        <div id="collection-list" class="grid grid-cols-1 md:grid-cols-2 gap-10"></div>
-      </main>
-    </div>
-  </div>
-
-  <div id="toast" class="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#f4f1ea] px-8 py-4 shadow-2xl transition-all duration-700 opacity-0 pointer-events-none z-[200] border-l-4 border-[#aa771c]">
-    <span id="toast-text" class="text-xs font-bold tracking-widest uppercase">館藏更新成功</span>
-  </div>
-
-  <!-- Firebase SDKs -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, where, deleteDoc, doc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyAUVkHUMInFnfXXxSBIdF18i5VDQb1eOMY",
-      authDomain: "collection-1ac37.firebaseapp.com",
-      projectId: "collection-1ac37",
-      storageBucket: "collection-1ac37.firebasestorage.app",
-      messagingSenderId: "708734269102",
-      appId: "1:708734269102:web:ff8be53ddb4a238ae81f3f",
-      measurementId: "G-N7NPDW115J"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    
-    let googleProvider = null; 
-    let currentUser = null;
-    let allItems = [];
-    let currentListenerUnsubscribe = null; // 紀錄當前的監聽器，避免背景重複多重監聽引發權限錯誤
-    
-    // 優先匹配 Sandbox 動態 appId，若無則回退預設
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'collection-1ac37';
-
-    // 認證鎖定閥
-    let isAuthProcessing = false;
-
-    // 1. 安全初始化 (遵守 RULE 3: 先登入，後讀取)
-    const initAuth = async () => {
-      if (isAuthProcessing) return;
-      isAuthProcessing = true;
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.warn("自訂認證未通過，正自動回退至訪客匿名認證...", error.message);
-        try {
-          await signInAnonymously(auth);
-        } catch (anonErr) {
-          console.error("匿名認證亦失敗:", anonErr);
-          const loadingEl = document.getElementById('auth-loading');
-          if (loadingEl) loadingEl.innerText = "雲端對接超時，請點擊重試。";
-          const buttonsEl = document.getElementById('login-buttons');
-          if (buttonsEl) buttonsEl.classList.remove('hidden');
-        }
-      } finally {
-        isAuthProcessing = false;
-      }
-    };
-
-    initAuth();
-
-    // 2. Google 登入邏輯
-    window.login = async () => {
-      if (isAuthProcessing) return;
-      isAuthProcessing = true;
-
-      const loadingEl = document.getElementById('auth-loading');
-      const gBtn = document.getElementById('google-login-btn');
-      const gText = document.getElementById('google-btn-text');
-
-      if (loadingEl) {
-        loadingEl.innerText = "正在聯絡 Google 認證伺服器...";
-        loadingEl.style.display = 'block';
-      }
-      if (gBtn) gBtn.disabled = true;
-      if (gText) gText.innerText = "驗證中...";
-      
-      if (!googleProvider) {
-        googleProvider = new GoogleAuthProvider();
-      }
-
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (error) {
-        console.warn("沙盒環境限制 Redirect，嘗試使用 Popup 方式登入:", error.code);
-        try {
-          await signInWithPopup(auth, googleProvider);
-        } catch (popupErr) {
-          console.error("彈出式 Google 登入失敗:", popupErr.message);
-          
-          if (popupErr.code === 'auth/cancelled-popup-request' || popupErr.code === 'auth/popup-blocked') {
-            showToast("安全政策阻擋 Popup，已為您自動進入匿名暫存模式。");
-            try {
-              await signInAnonymously(auth);
-            } catch (anonErr) {
-              console.error("匿名登入失敗:", anonErr);
-            }
-          } else {
-            alert("Google 登入失敗：" + popupErr.message);
-          }
-        }
-      } finally {
-        isAuthProcessing = false;
-        if (gBtn) gBtn.disabled = false;
-        if (gText) gText.innerText = "使用 Google 帳戶登入";
-      }
-    };
-
-    window.logout = async () => {
-      if (isAuthProcessing) return;
-      isAuthProcessing = true;
-      
-      // 先註銷即時監聽，避免引發登出後的權限不足 (Permissions denied)
-      if (currentListenerUnsubscribe) {
-        currentListenerUnsubscribe();
-        currentListenerUnsubscribe = null;
-      }
-
-      try {
-        await signOut(auth);
-      } catch (err) {
-        console.error("登出失敗:", err);
-      } finally {
-        isAuthProcessing = false;
-      }
-    };
-
-    window.bypassWithAnonymous = async () => {
-      if (isAuthProcessing) return;
-      isAuthProcessing = true;
-      try {
-        await signInAnonymously(auth);
-      } catch (err) {
-        console.error("訪客認證失敗:", err);
-      } finally {
-        isAuthProcessing = false;
-      }
-    };
-
-    window.handleSave = handleSave;
-    window.handleDelete = handleDelete;
-    window.handleSearch = handleSearch;
-
-    if (window.location.hash || window.location.search) {
-      getRedirectResult(auth).catch((error) => {
-        if (error.code && error.code !== 'auth/redirect-cancelled-by-user') {
-          console.error("Redirect 結果解析失敗:", error);
-        }
-      });
-    }
-
-    // 狀態監控
-    onAuthStateChanged(auth, (user) => {
-      const overlay = document.getElementById('auth-overlay');
-      const logoutBtn = document.getElementById('logout-btn');
-      const upgradeBtn = document.getElementById('login-upgrade-btn');
-
-      if (user) {
-        currentUser = user;
-        if (overlay) {
-          overlay.style.opacity = '0';
-          setTimeout(() => overlay.style.display = 'none', 500);
-        }
-
-        if (user.isAnonymous) {
-          const displayEl = document.getElementById('user-display');
-          if (displayEl) displayEl.innerText = `管理員：訪客畫師 (匿名暫存)`;
-          if (logoutBtn) logoutBtn.classList.add('hidden');
-          if (upgradeBtn) upgradeBtn.classList.remove('hidden');
-        } else {
-          const displayEl = document.getElementById('user-display');
-          if (displayEl) displayEl.innerText = `管理員：${user.displayName || user.email}`;
-          if (logoutBtn) logoutBtn.classList.remove('hidden');
-          if (upgradeBtn) upgradeBtn.classList.add('hidden');
-        }
-        
-        initCollectionListener();
-      } else {
-        currentUser = null;
-        if (currentListenerUnsubscribe) {
-          currentListenerUnsubscribe();
-          currentListenerUnsubscribe = null;
-        }
-        if (overlay) {
-          overlay.style.display = 'flex';
-          overlay.style.opacity = '1';
-        }
-        const loadingEl = document.getElementById('auth-loading');
-        if (loadingEl) {
-          loadingEl.style.display = 'block';
-          loadingEl.innerText = "正在安全對接雲端畫廊，請稍候...";
-        }
-        const buttonsEl = document.getElementById('login-buttons');
-        if (buttonsEl) buttonsEl.classList.add('hidden');
-        const listEl = document.getElementById('collection-list');
-        if (listEl) listEl.innerHTML = '';
-      }
-    });
-
-    // 3. 監聽並加載數據 (遵守 RULE 1, 2, 3 完整組合)
-    function initCollectionListener() {
-      // 嚴密防禦網：未完全登入或 UID 遺失時，絕對不開啟 Firestore 監聽 (RULE 3)
-      if (!currentUser || !currentUser.uid || !appId || appId === "undefined") {
-        console.warn("暫緩開啟 Firestore 監聽：認證狀態不完整。");
-        return;
-      }
-      
-      const loader = document.getElementById('loading');
-      if (loader) loader.classList.remove('hidden');
-      
-      // 避免重複註冊多個衝突的監聽器
-      if (currentListenerUnsubscribe) {
-        currentListenerUnsubscribe();
-        currentListenerUnsubscribe = null;
-      }
-      
-      // 確保這裡的路徑與安全性規則完全一致 (RULE 1)
-      const q = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks');
-      
-      currentListenerUnsubscribe = onSnapshot(q, (snapshot) => {
-        allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // 前端排序，避開 Firebase 因缺少多欄位索引 (Index) 而拋出的權限限制錯誤 (RULE 2)
-        allItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        renderList(allItems);
-        updateHeaderValue();
-        if (loader) loader.classList.add('hidden');
-      }, (err) => {
-        console.error("Firestore 監聽拒絕 (請確認已將 rules.txt 發佈到 Firebase 控制台):", err);
-        showToast("雲端連線受阻，請先在控制台發佈最新的安全規則！");
+        console.error("Firestore 監聽拒絕 (請確認已將 rules.txt 發佈至 Firebase):", err);
       });
     }
 
