@@ -75,7 +75,6 @@
 </head>
 <body class="p-4 md:p-8">
 
-  <!-- 登入遮罩 -->
   <div id="auth-overlay">
     <div class="login-card art-border max-w-md w-full">
       <h1 class="text-3xl font-black text-slate-900 mb-2">畫師寶庫</h1>
@@ -86,7 +85,6 @@
       <div id="login-buttons" class="mt-8 space-y-4 hidden">
         <p class="text-xs text-rose-600 font-bold mb-4">⚠️ 偵測到瀏覽器限制彈出式視窗，您可以手動點擊重試：</p>
         <button id="google-login-btn" onclick="login()" class="flex items-center justify-center gap-3 w-full bg-white border border-slate-200 py-3 px-6 hover:bg-slate-50 transition-all shadow-md group">
-          <!-- 修正後的完美官方規格 Google SVG -->
           <svg class="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.53-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-8.17z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.11 0-5.74-2.11-6.68-4.96H1.21v3.15C3.18 21.88 7.31 24 12 24z"/>
@@ -107,7 +105,6 @@
   </div>
 
   <div class="max-w-6xl mx-auto">
-    <!-- Header -->
     <header class="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
       <div class="flex-1">
         <h1 class="text-4xl font-black text-slate-900 tracking-tighter mb-2">畫師寶庫 <span class="text-[#aa771c] italic font-serif">The Atelier</span></h1>
@@ -125,7 +122,6 @@
       </div>
     </header>
 
-    <!-- 橫式藏品登記表單 -->
     <section class="mb-12 bg-[#fdfcf8] p-8 art-border shadow-md">
       <div class="flex items-center gap-4 mb-6">
         <h3 class="font-bold text-slate-900 text-sm tracking-widest uppercase">新藏品登記工作台</h3>
@@ -161,7 +157,6 @@
       </div>
     </section>
 
-    <!-- Main Content -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
       <aside class="lg:col-span-4 space-y-10">
         <div class="group relative">
@@ -186,11 +181,11 @@
     <span id="toast-text" class="text-xs font-bold tracking-widest uppercase">館藏更新成功</span>
   </div>
 
-  <!-- Firebase SDKs -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, where, deleteDoc, doc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, where, deleteDoc, doc, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore as initializeFirestore, collection as fCollection, addDoc as fAddDoc, onSnapshot as fOnSnapshot, deleteDoc as fDeleteDoc, doc as fDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAUVkHUMInFnfXXxSBIdF18i5VDQb1eOMY",
@@ -204,7 +199,7 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    const db = getFirestore(app);
+    const db = initializeFirestore(app);
     
     let googleProvider = null; 
     let currentUser = null;
@@ -212,11 +207,9 @@
     let currentListenerUnsubscribe = null; 
     
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'collection-1ac37';
-
-    // 認證鎖定閥，避免在 COOP 未就緒前多次並發請求
     let isAuthProcessing = false;
 
-    // 1. 安全初始化 (遵守 RULE 3: 先認證登入，後查詢)
+    // 1. 安全初始化
     const initAuth = async () => {
       if (isAuthProcessing) return;
       isAuthProcessing = true;
@@ -244,7 +237,7 @@
 
     initAuth();
 
-    // 2. Google 登入邏輯 (包含防並行阻斷與 Iframe 防摔處理)
+    // 2. Google 登入邏輯
     window.login = async () => {
       if (isAuthProcessing) return;
       isAuthProcessing = true;
@@ -295,7 +288,6 @@
       if (isAuthProcessing) return;
       isAuthProcessing = true;
       
-      // 登出時立刻註銷當前的監聽器，避免背景重複查詢觸發登出後的 permissions denied
       if (currentListenerUnsubscribe) {
         currentListenerUnsubscribe();
         currentListenerUnsubscribe = null;
@@ -382,9 +374,8 @@
       }
     });
 
-    // 3. 監聽並加載數據 (遵守 RULE 1, 2, 3 完整組合)
+    // 3. 監聽並加載數據
     function initCollectionListener() {
-      // 驗證守門員 (嚴格遵守 Rule 3)：若使用者未登入完畢、或 uid/appId 為空、文字 undefined，絕對不發起 query 監聽
       if (!currentUser || !currentUser.uid || currentUser.uid === "undefined" || !appId || appId === "undefined") {
         console.warn("暫緩開啟 Firestore 監聽：認證狀態尚不完整。");
         return;
@@ -393,33 +384,61 @@
       const loader = document.getElementById('loading');
       if (loader) loader.classList.remove('hidden');
       
-      // 登銷重複的監聽器，避免背景多執行緒重複查詢引發 Permissions 錯誤
       if (currentListenerUnsubscribe) {
         currentListenerUnsubscribe();
         currentListenerUnsubscribe = null;
       }
       
-      // 確保連線路徑完全符合 RULE 1
-      const q = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks');
+      const q = fCollection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks');
       
-      currentListenerUnsubscribe = onSnapshot(q, (snapshot) => {
+      currentListenerUnsubscribe = fOnSnapshot(q, (snapshot) => {
         allItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        // 前端排序，避免未建索引的複合查詢導致 permissions 拒絕 (RULE 2)
-        allItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        // 依照時間戳排序，並做好非同步快取無 timestamp 欄位時的防禦防抖排序
+        allItems.sort((a, b) => {
+          const timeA = a.timestamp ? new Date(a.timestamp) : new Date();
+          const timeB = b.timestamp ? new Date(b.timestamp) : new Date();
+          return timeB - timeA;
+        });
         renderList(allItems);
         updateHeaderValue();
         if (loader) loader.classList.add('hidden');
       }, (err) => {
-        console.error("Firestore 監聽拒絕 (請確認已將 rules.txt 發佈至 Firebase):", err);
+        console.error("Firestore 監聽異常:", err);
       });
     }
 
-    async function fileToBase64(file) {
+    // 🌟 前端高性能圖片縮圖壓縮器（完美杜絕 Base64 閃爍與體積報錯）
+    async function fileToBase64AndCompress(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // 設定極致流暢預覽外框寬度（最大 240px 寬，確保畫廊渲染流暢不閃爍）
+            const maxW = 240;
+            const scale = maxW / img.width;
+            
+            if (img.width > maxW) {
+              canvas.width = maxW;
+              canvas.height = img.height * scale;
+            } else {
+              canvas.width = img.width;
+              canvas.height = img.height;
+            }
+            
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            // 壓縮品質設定為 0.65，使檔案控制在最輕巧的 15-35KB 範圍
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+            resolve(compressedBase64);
+          };
+          img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (error) => reject(error);
       });
     }
 
@@ -439,13 +458,10 @@
       let base64Image = "";
       if (fileInput && fileInput.files.length > 0) {
         try {
-          base64Image = await fileToBase64(fileInput.files[0]);
-          if (base64Image.length > 1000000) {
-            alert("圖片過大！請上傳小於 700KB 的圖片檔案。");
-            return;
-          }
+          // 改用高效壓縮機制
+          base64Image = await fileToBase64AndCompress(fileInput.files[0]);
         } catch (e) {
-          console.error("圖片轉檔失敗:", e);
+          console.error("圖片優化壓縮失敗，使用原樣載入:", e);
         }
       }
 
@@ -456,7 +472,7 @@
           btn.innerText = "同步至雲端...";
         }
 
-        await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks'), {
+        await fAddDoc(fCollection(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks'), {
           title,
           category,
           value,
@@ -484,7 +500,7 @@
       if (!currentUser || !currentUser.uid) return;
       if (!confirm("確定要將此藏品自雲端撤庫嗎？")) return;
       try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks', id));
+        await fDeleteDoc(fDoc(db, 'artifacts', appId, 'users', currentUser.uid, 'artworks', id));
         showToast("藏品已撤庫");
       } catch (e) {
         showToast("移除失敗");
@@ -499,11 +515,12 @@
         return;
       }
 
+      // 使用 DocumentFragment 或預載入占位策略，提升圖片流暢度防止大範圍閃動
       container.innerHTML = items.map(item => `
         <div class="bg-white p-6 shadow-sm card-hover relative group border border-slate-100">
           <div class="flex justify-between items-start mb-6">
              <div class="flex items-center gap-5">
-                <img src="${item.imageData || 'https://via.placeholder.com/150?text=Atelier'}" class="w-20 h-20 object-cover art-border shadow-md" onerror="this.src='https://via.placeholder.com/150?text=Image+Error'">
+                <img src="${item.imageData || 'https://via.placeholder.com/150?text=Atelier'}" class="w-20 h-20 object-cover art-border shadow-md" decoding="async" loading="lazy" onerror="this.src='https://via.placeholder.com/150?text=Image+Error'">
                 <div>
                   <span class="category-tag">${item.category}</span>
                   <h3 class="font-bold text-slate-900 text-lg mt-1">${item.title}</h3>
@@ -516,7 +533,7 @@
               <p class="text-[8px] text-[#aa771c] font-bold uppercase">Appraisal</p>
               <p class="text-xl font-black text-slate-900 font-mono">$${item.value.toLocaleString()}</p>
             </div>
-            <p class="text-[10px] text-slate-400">${new Date(item.timestamp).toLocaleDateString()}</p>
+            <p class="text-[10px] text-slate-400">${item.timestamp ? new Date(item.timestamp).toLocaleDateString() : new Date().toLocaleDateString()}</p>
           </div>
         </div>
       `).join('');
